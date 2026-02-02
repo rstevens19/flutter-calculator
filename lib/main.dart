@@ -39,7 +39,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     '4', '5', '6', '*',
     '1', '2', '3', '-',
     '0', '.', '=', '+',
-    'C'
+    'C', 'x^2', '(', ')',
+    '%'
   ];
 
   void _onButtonPressed(String value) {
@@ -48,10 +49,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         _clearAll();
       } else if (value == '=') {
         _calculateResult();
+      } else if (value == 'x^2') {
+        _squareValue();
       } else if (value == '/' || value == '*' || value == '-' || value == '+') {
         _addOperator(value);
+      } else if (value == '(' || value == ')') {
+        _addParenthesis(value);
       } else if (value == '.') {
         _addDecimal();
+      } else if (value == '%'){
+        _addModulo();
       } else {
         _addNumber(value);
       }
@@ -71,6 +78,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     }
   }
 
+  void _addModulo() {
+    // Allow modulo if there's display input or if expression ends with ')'
+    if (_displayInput.isEmpty && !_expression.endsWith(')')) return;
+
+    if (_displayInput.isNotEmpty) {
+      _expression += _displayInput + '%';
+      _displayInput = '';
+    } else {
+      // Add operator directly to expression (after ')')
+      _expression += '%';
+    }
+    _accumulatorDisplay = _expression.trim();
+  }
+
   void _addDecimal() {
     // Prevent multiple decimals in the same number
     if (!_displayInput.contains('.') && _displayInput.isNotEmpty) {
@@ -79,11 +100,71 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     }
   }
 
-  void _addOperator(String operator) {
-    if (_displayInput.isEmpty) return;
+  void _addParenthesis(String parenthesis) {
+    if (parenthesis == '(') {
+      // If there's a number in display input, add it to expression first
+      if (_displayInput.isNotEmpty) {
+        _expression += _displayInput;
+        _displayInput = '';
+      }
+      _expression += '(';
+    } else if (parenthesis == ')') {
+      // Add display input to expression if it exists
+      if (_displayInput.isNotEmpty) {
+        _expression += _displayInput;
+        _displayInput = '';
+      }
+      _expression += ')';
+    }
+    _updateDisplay();
+  }
 
-    _expression += _displayInput + operator;
-    _displayInput = '';
+  void _squareValue() {
+    if (_displayInput.isEmpty && _expression.isEmpty) return;
+
+    try {
+      // If there's a display input, square it
+      if (_displayInput.isNotEmpty) {
+        final value = double.parse(_displayInput);
+        final squared = value * value;
+        final formattedResult = _formatResult(squared);
+        
+        // Show the full expression with the value being squared
+        _accumulatorDisplay = '($_displayInput)^2 = $formattedResult';
+        _displayInput = formattedResult;
+        _expression = '';
+      }
+      // If there's an expression, we need to complete it first
+      else if (_expression.isNotEmpty) {
+        final expression = Expression.parse(_expression);
+        final evaluator = const ExpressionEvaluator();
+        final result = evaluator.eval(expression, {});
+        final squared = (result as num) * (result as num);
+        final formattedResult = _formatResult(squared);
+        
+        // Show the full expression: calculated result squared
+        _accumulatorDisplay = '($_expression)^2 = $formattedResult';
+        _displayInput = formattedResult;
+        _expression = '';
+      }
+    } catch (e) {
+      _accumulatorDisplay = 'Error';
+      _expression = '';
+      _displayInput = '';
+    }
+  }
+
+  void _addOperator(String operator) {
+    // Allow operator if there's display input or if expression ends with ')'
+    if (_displayInput.isEmpty && !_expression.endsWith(')')) return;
+
+    if (_displayInput.isNotEmpty) {
+      _expression += _displayInput + operator;
+      _displayInput = '';
+    } else {
+      // Add operator directly to expression (after ')')
+      _expression += operator;
+    }
     _accumulatorDisplay = _expression.trim();
   }
 
@@ -204,6 +285,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     bool isOperator = label == '+' || label == '-' || label == '*' || label == '/';
     bool isEquals = label == '=';
     bool isClear = label == 'C';
+    bool isSquare = label == 'x^2';
+    bool isParenthesis = label == '(' || label == ')';
+    bool isModulo = label == '%';
 
     Color buttonColor;
     Color textColor;
@@ -211,7 +295,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     if (isClear) {
       buttonColor = const Color.fromARGB(255, 193, 10, 248);
       textColor = Colors.black;
-    } else if (isOperator) {
+    } else if (isOperator || isSquare || isParenthesis || isModulo) {
       buttonColor = const Color.fromARGB(255, 187, 255, 0);
       textColor = Colors.black;
     } else if (isEquals) {
